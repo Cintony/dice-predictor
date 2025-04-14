@@ -52,6 +52,25 @@ def analyze_results(totals):
 
     return stats, max_streak, results
 
+# Phân tích nhịp Tài/Xỉu
+
+def analyze_patterns(results):
+    st.subheader("🔄 Phân tích nhịp Tài/Xỉu")
+    pattern = []
+    if not results:
+        return
+    count = 1
+    for i in range(1, len(results)):
+        if results[i] == results[i-1]:
+            count += 1
+        else:
+            if results[i-1] in ["Tài", "Xỉu"]:
+                pattern.append(f"{count} {results[i-1]}")
+            count = 1
+    if results[-1] in ["Tài", "Xỉu"]:
+        pattern.append(f"{count} {results[-1]}")
+    st.write(" → ".join(pattern))
+
 # Dự đoán xu hướng tiếp theo
 def predict_next(results):
     if not results:
@@ -103,6 +122,22 @@ def capital_control(totals, results):
     else:
         st.warning(f"⚠️ Cảnh báo. Sau 10 tay: Âm {balance:,} VND — cân nhắc lại chiến lược!")
 
+# Mô phỏng kết quả tương lai
+def simulate_future(results, steps=10):
+    if not results:
+        return []
+
+    simulated = []
+    last = results[-1]
+    for _ in range(steps):
+        if last in ["Tài", "Xỉu"]:
+            next_result = "Xỉu" if last == "Tài" else "Tài"
+        else:
+            next_result = "Tài"
+        simulated.append(next_result)
+        last = next_result
+    return simulated
+
 # Hiển thị kết quả phân tích
 stats, max_streak, results = analyze_results(totals)
 
@@ -122,6 +157,28 @@ st.info(prediction)
 capital_control(totals, results)
 
 # Biểu đồ nhanh
-st.subheader("📈 Biểu đồ Tài/Xỉu")
 df_chart = pd.DataFrame(results, columns=["Kết quả"])
+st.subheader("📈 Biểu đồ Tài/Xỉu")
 st.bar_chart(df_chart["Kết quả"].value_counts())
+
+# Biểu đồ chuỗi kết quả theo thời gian
+st.subheader("🕒 Biểu đồ xu hướng theo thời gian")
+df_timeline = df_chart.copy()
+df_timeline["Phiên"] = range(1, len(df_chart)+1)
+df_timeline["Giá trị"] = df_timeline["Kết quả"].map({"Tài": 2, "Xỉu": 1, "Bộ ba": 0})
+fig, ax = plt.subplots()
+ax.plot(df_timeline["Phiên"], df_timeline["Giá trị"], marker="o")
+ax.set_yticks([0, 1, 2])
+ax.set_yticklabels(["Bộ ba", "Xỉu", "Tài"])
+ax.set_xlabel("Phiên")
+ax.set_ylabel("Kết quả")
+ax.set_title("Xu hướng kết quả theo thời gian")
+st.pyplot(fig)
+
+# Phân tích nhịp Tài/Xỉu
+analyze_patterns(results)
+
+# Mô phỏng
+st.subheader("🔮 Mô phỏng 10 kết quả tiếp theo nếu theo xu hướng đảo chiều")
+simulated = simulate_future(results)
+st.write(simulated)
