@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from collections import Counter
 
 st.set_page_config(page_title="Phân tích Tài/Xỉu", layout="centered")
 
@@ -52,11 +53,11 @@ def analyze_results(totals):
 
     return stats, max_streak, results
 
-# Phân tích nhịp Tài/Xỉu
-
+# Phân tích nhịp Tài/Xỉu chi tiết
 def analyze_patterns(results):
-    st.subheader("🔄 Phân tích nhịp Tài/Xỉu")
+    st.subheader("🔄 Phân tích nhịp Tài/Xỉu chi tiết")
     pattern = []
+    counts = []
     if not results:
         return
     count = 1
@@ -66,10 +67,18 @@ def analyze_patterns(results):
         else:
             if results[i-1] in ["Tài", "Xỉu"]:
                 pattern.append(f"{count} {results[i-1]}")
+                counts.append((results[i-1], count))
             count = 1
     if results[-1] in ["Tài", "Xỉu"]:
         pattern.append(f"{count} {results[-1]}")
+        counts.append((results[-1], count))
     st.write(" → ".join(pattern))
+
+    # Tần suất theo độ dài nhịp
+    st.markdown("#### 📌 Tần suất độ dài nhịp")
+    df = pd.DataFrame(counts, columns=["Loại", "Độ dài"])
+    freq = df.groupby(["Loại", "Độ dài"]).size().unstack().fillna(0).astype(int)
+    st.dataframe(freq)
 
 # Dự đoán xu hướng tiếp theo
 def predict_next(results):
@@ -93,7 +102,6 @@ def predict_next(results):
     return f"⏭ Dự đoán: Khả năng cao tiếp theo là **{last}**"
 
 # Gợi ý kiểm soát vốn
-
 def capital_control(totals, results):
     st.subheader("💰 Gợi ý kiểm soát vốn (10 tay gần nhất)")
 
@@ -175,7 +183,7 @@ ax.set_ylabel("Kết quả")
 ax.set_title("Xu hướng kết quả theo thời gian")
 st.pyplot(fig)
 
-# Phân tích nhịp Tài/Xỉu
+# Phân tích nhịp Tài/Xỉu chi tiết
 analyze_patterns(results)
 
 # Mô phỏng
