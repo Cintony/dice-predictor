@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-from collections import Counter
 
-st.set_page_config(page_title="Dự đoán xúc xắc", layout="centered")
-st.title("🎲 Tool phân tích & dự đoán xúc xắc (3 con)")
+st.set_page_config(page_title="Phân tích Tài/Xỉu", layout="centered")
+st.title("🎲 Tool phân tích & dự đoán Tài/Xỉu (3 xúc xắc)")
 
 # --- Nhập dữ liệu ---
 st.header("📥 Nhập dữ liệu")
@@ -30,51 +29,76 @@ for line in lines:
 
 if data:
     df = pd.DataFrame(data, columns=["Xúc xắc 1", "Xúc xắc 2", "Xúc xắc 3"])
-    st.success(f"✅ Đã tải {len(df)} dòng dữ liệu")
+    df["Tổng"] = df.sum(axis=1)
+    df["Tài/Xỉu"] = df["Tổng"].apply(lambda x: "Xỉu" if x <= 10 else "Tài")
 
-    # Giới hạn 100 dòng gần nhất để phân tích xu hướng
     recent_df = df.tail(100)
+    st.success(f"✅ Đã nạp {len(df)} dòng dữ liệu — phân tích 100 dòng gần nhất")
 
-    st.subheader("📋 100 lần gần nhất dùng để phân tích")
+    st.subheader("📋 Dữ liệu 100 lần gần nhất")
     st.dataframe(recent_df)
 
-    st.header("📊 Phân tích & Gợi ý")
+    st.header("📊 Phân tích Tài/Xỉu")
 
-    for i in range(3):
-        col_name = f"Xúc xắc {i+1}"
-        counts = recent_df[col_name].value_counts().sort_index()
-        st.subheader(f"🎲 {col_name} (trên 100 lần gần nhất)")
-        st.bar_chart(counts)
+    counts = recent_df["Tài/Xỉu"].value_counts()
+    st.bar_chart(counts)
 
-        recent = recent_df[col_name].tail(10)
-        most_common = recent.value_counts().idxmax()
-        st.markdown(f"**🔍 Xu hướng gần đây (10 lần): `{most_common}`**")
-        st.markdown(f"**🧠 Gợi ý giá trị tiếp theo: `{most_common}`**")
+    # --- Dự đoán kết quả tiếp theo ---
+    st.header("🔮 Dự đoán lần tiếp theo")
+
+    full_tai_xiu = list(df["Tài/Xỉu"])
+    last_1000 = full_tai_xiu[-1000:] if len(full_tai_xiu) >= 1000 else full_tai_xiu
+    predicted_next = pd.Series(last_1000).value_counts().idxmax()
+
+    st.markdown(f"**📌 Dự đoán Tài/Xỉu lần kế tiếp (dựa vào {len(last_1000)} lần gần nhất): `{predicted_next}`**")
 
     # --- Đánh giá độ chính xác ---
-    st.subheader("📈 Đánh giá độ chính xác (so sánh dự đoán với thực tế)")
+    st.header("📈 Đánh giá độ chính xác dự đoán")
 
-    correct_count = 0
-    total_predicts = 0
+    recent_tai_xiu = list(recent_df["Tài/Xỉu"])
+    correct = 0
+    total = 0
+    for i in range(10, len(recent_tai_xiu)):
+        prev_10 = recent_tai_xiu[i-10:i]
+        pred = pd.Series(prev_10).value_counts().idxmax()
+        actual = recent_tai_xiu[i]
+        if pred == actual:
+            correct += 1
+        total += 1
 
-    for i in range(3):
-        col_name = f"Xúc xắc {i+1}"
-        col_values = recent_df[col_name]
+    acc = correct / total if total else 0
+    st.metric("🎯 Độ chính xác dự đoán (10 gần nhất)", f"{acc*100:.2f}%")
 
-        if len(col_values) < 11:
-            st.info(f"Không đủ dữ liệu để đánh giá cho {col_name}")
-            continue
+    # --- Gợi ý kiểm soát vốn ---
+    st.header("💰 Gợi ý kiểm soát vốn cho 10 tay")
 
-        # Dự đoán từng bước từ dòng 10 trở đi
-        for j in range(10, len(col_values)):
-            recent_10 = col_values[j-10:j]
-            predicted = recent_10.value_counts().idxmax()
-            actual = col_values[j]
-            if predicted == actual:
-                correct_count += 1
-            total_predicts += 1
+    base_bet = st.number_input("🔢 Nhập mức cược cơ bản (VD: 10000)", min_value=1000, value=10000, step=1000)
 
-    accuracy = correct_count / total_predicts if total_predicts > 0 else 0
-    st.metric("🎯 Độ chính xác dự đoán", f"{accuracy*100:.2f}%")
+    sim_tai_xiu = recent_tai_xiu[-10:] if len(recent_tai_xiu) >= 10 else recent_tai_xiu
+    sim_results = []
+    balance = 0
+    bet = base_bet
+
+    for i in range(10):
+        actual = sim_tai_xiu[i % len(sim_tai_xiu)]  # Lặp lại nếu không đủ 10 kết quả
+        win = (actual == predicted_next)
+        profit = bet if win else -bet
+        balance += profit
+        sim_results.append({
+            "Tay": i+1,
+            "Cược": bet,
+            "Thắng": "✅" if win else "❌",
+            "Lãi/lỗ": profit,
+            "Tổng cộng": balance
+        })
+        bet = base_bet if win else min(bet * 2, base_bet * 4)
+
+    sim_df = pd.DataFrame(sim_results)
+    st.dataframe(sim_df)
+
+    if balance >= 0:
+        st.success(f"✅ Kế hoạch OK. Sau 10 tay bạn **lãi {balance:,.0f} VND**.")
+    else:
+        st.error(f"⚠️ Sau 10 tay bạn **lỗ {balance:,.0f} VND**. Cân nhắc điều chỉnh chiến lược.")
 else:
-    st.warning("⚠️ Vui lòng nhập dữ liệu để phân tích.")
+    st.warning("⚠️ Vui lòng nhập dữ liệu hợp lệ (3 số từ 1-6 trên mỗi dòng).")
