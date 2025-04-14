@@ -31,17 +31,22 @@ for line in lines:
 if data:
     df = pd.DataFrame(data, columns=["Xúc xắc 1", "Xúc xắc 2", "Xúc xắc 3"])
     st.success(f"✅ Đã tải {len(df)} dòng dữ liệu")
-    st.dataframe(df)
+
+    # Giới hạn 100 dòng gần nhất để phân tích xu hướng
+    recent_df = df.tail(100)
+
+    st.subheader("📋 100 lần gần nhất dùng để phân tích")
+    st.dataframe(recent_df)
 
     st.header("📊 Phân tích & Gợi ý")
 
     for i in range(3):
         col_name = f"Xúc xắc {i+1}"
-        counts = df[col_name].value_counts().sort_index()
-        st.subheader(f"🎲 {col_name}")
+        counts = recent_df[col_name].value_counts().sort_index()
+        st.subheader(f"🎲 {col_name} (trên 100 lần gần nhất)")
         st.bar_chart(counts)
 
-        recent = df[col_name].tail(10)
+        recent = recent_df[col_name].tail(10)
         most_common = recent.value_counts().idxmax()
         st.markdown(f"**🔍 Xu hướng gần đây (10 lần): `{most_common}`**")
         st.markdown(f"**🧠 Gợi ý giá trị tiếp theo: `{most_common}`**")
@@ -54,7 +59,7 @@ if data:
 
     for i in range(3):
         col_name = f"Xúc xắc {i+1}"
-        col_values = df[col_name]
+        col_values = recent_df[col_name]
 
         if len(col_values) < 11:
             st.info(f"Không đủ dữ liệu để đánh giá cho {col_name}")
